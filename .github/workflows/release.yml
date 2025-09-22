@@ -160,17 +160,17 @@ jobs:
             } > "$OUT"
           fi
 
-          # short summary json (counts) — 関数未使用で古い jq でも動く版
+          # short summary json (counts) — legacy version without jq functions, works with older jq
           SUM="RELEASE_SUMMARY-${flavor}.json"
           flavor="$flavor" rel="$rel" prev="$prev" \
           jq -n --slurpfile old "$OLD_JSON" --slurpfile nw "$NEW_JSON" '
-            # 旧/新の components 配列を取り出し（null ガード）
+            # Extract components array from old/new (null guard)
             ($old|length>0 and ($old[0]|type=="object")) as $hasOld |
             ($nw|length>0  and ($nw[0]|type=="object"))  as $hasNew |
             (if $hasOld then ($old[0].components // []) else [] end) as $OC |
             (if $hasNew then ($nw[0].components  // []) else [] end) as $NC |
 
-            # key: purl 優先、無ければ group:name
+            # key: prefer purl, fallback group:name
             (reduce $OC[] as $c ({}; .[
               ( $c.purl // ( ($c.group // "") + ":" + ($c.name // "") ) )
             ] = ($c.version // ""))) as $OS |
@@ -196,7 +196,7 @@ jobs:
               note: (if ($hasOld and $hasNew) then "" else "no old/new sbom" end)
             }' > "$SUM"
 
-          # 長文の .md は gzip も用意（本文に貼らずアセットで配布）
+          # Provide gzipped version of the long .md (distributed as asset, not embedded in body)
           gzip -9f < "$OUT" > "${OUT}.gz"
 
       - name: Upload changelog artifact (md + gz)
@@ -245,7 +245,7 @@ jobs:
           pattern: '*'
           merge-multiple: true
 
-      - name: Build release body (summary table only; md gz は assets)
+      - name: Build release body (summary table only; md gz are assets)
         id: body
         shell: bash
         run: |
