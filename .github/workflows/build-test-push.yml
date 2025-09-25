@@ -294,18 +294,24 @@ jobs:
           username: ${{ env.production == 'true' && secrets.DOCKERHUB_USERNAME || secrets.TEST_DOCKERHUB_USERNAME }}
           password: ${{ env.production == 'true' && secrets.DOCKERHUB_TOKEN || secrets.TEST_DOCKERHUB_TOKEN }}
 
-      -
-        name: Login to Quay.io
-        if: contains(env.registries, 'quay.io') && env.check_update != 0
+      - name: Login to Quay.io
+        if: contains(env.registries, 'quay.io') && env.check_update != 0 &&
+            (
+              (env.production == 'true'  && secrets.QUAY_IO_USERNAME != '' && secrets.QUAY_IO_CLI_PASSWORD != '') ||
+              (env.production != 'true' && secrets.TEST_QUAY_IO_USERNAME != '' && secrets.TEST_QUAY_IO_CLI_PASSWORD != '')
+            )
         uses: docker/login-action@v3
         with:
-          registry: quay.io
-          username: ${{ env.production == 'true' && secrets.QUAY_IO_USERNAME || secrets.TEST_QUAY_IO_USERNAME }}
-          password: ${{ env.production == 'true' && secrets.QUAY_IO_CLI_PASSWORD || secrets.TEST_QUAY_IO_CLI_PASSWORD }}
-
+        registry: quay.io
+        username: ${{ env.production == 'true' && secrets.QUAY_IO_USERNAME || secrets.TEST_QUAY_IO_USERNAME }}
+        password: ${{ env.production == 'true' && secrets.QUAY_IO_CLI_PASSWORD || secrets.TEST_QUAY_IO_CLI_PASSWORD }} 
       -
         name: Login to Ghcr.io
-        if: contains(env.registries, 'ghcr.io') && env.check_update != 0
+        if: contains(env.registries, 'quay.io') && env.check_update != 0 &&
+          (
+            (env.production == 'true'  && secrets.QUAY_IO_USERNAME != '' && secrets.QUAY_IO_CLI_PASSWORD != '') ||
+            (env.production != 'true' && secrets.TEST_QUAY_IO_USERNAME != '' && secrets.TEST_QUAY_IO_CLI_PASSWORD != '')
+          )
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
