@@ -274,17 +274,6 @@ jobs:
         if: env.check_update != 0
         uses: docker/setup-buildx-action@v3
 
-      - name: Debug login context
-        if: contains(env.registries, 'docker.io') && env.check_update != 0
-        run: |
-          echo "production=${{ env.production }}"
-          echo "registries=${{ env.registries }}"
-          # Secrets の中身は出さない。設定有無だけを判定
-          has_user="${{ secrets.TEST_DOCKERHUB_USERNAME != '' }}"
-          has_token="${{ secrets.TEST_DOCKERHUB_TOKEN != '' }}"
-          echo "TEST_DOCKERHUB_USERNAME set? ${has_user}"
-          echo "TEST_DOCKERHUB_TOKEN set? ${has_token}"
-
       -
         name: Login to Docker.io
         if: contains(env.registries, 'docker.io') && env.check_update != 0
