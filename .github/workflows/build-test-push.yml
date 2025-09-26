@@ -658,7 +658,7 @@ jobs:
           pull: '--rebase --autostash'
           message: "AlmaLinux ${{ matrix.version_major }} ${{ matrix.image_types }} - ${{ env.date_stamp }} ${{ env.time_stamp }} (generated on ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})."
           push: true
-          # ===== New Job: Publish RPM diff to GitHub Release =====
+
     publish-rpm-diff:
       name: Publish RPM diff to GitHub Release
       runs-on: ubuntu-24.04
