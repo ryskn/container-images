@@ -673,45 +673,61 @@ jobs:
       - name: Check artifacts existence
         id: chk
         run: |
-          if [ ! -d "_rpm_diff_all" ] || ! ls -1 _rpm_diff_all/*/*.md >/dev/null 2>&1; then
-            echo "found=false" >> $GITHUB_OUTPUT
+          set -euo pipefail
+          # download-artifact の展開階層をフラット化（あれば）
+          if [ -d "_rpm_diff_all/rpm_diff_artifacts" ]; then
+            rsync -a _rpm_diff_all/rpm_diff_artifacts/ _rpm_diff_all/
+            rm -rf _rpm_diff_all/rpm_diff_artifacts
+          fi
+
+          # どこにあっても rpm_diff_*.md が1つ以上あればOK
+          if ! find _rpm_diff_all -type f -name 'rpm_diff_*.md' | grep -q .; then
+            echo "found=false" >> "$GITHUB_OUTPUT"
             echo "No RPM diff artifacts found. Skipping release."
             exit 0
           fi
-          echo "found=true" >> $GITHUB_OUTPUT
+          echo "found=true" >> "$GITHUB_OUTPUT"
       - name: Compose release notes (group by version)
         if: steps.chk.outputs.found == 'true'
         id: notes
         run: |
           set -euo pipefail
+
           DATE_STAMP='${{ needs.init-data.outputs.date_stamp }}'
           TIME_STAMP='${{ needs.init-data.outputs.time_stamp }}'
           PROD='${{ needs.init-data.outputs.production }}'
 
           header="# AlmaLinux Container Images – RPM diffs (${DATE_STAMP} ${TIME_STAMP} UTC)\n"
           [ "${PROD}" = "true" ] && header="${header}\n_Release type: **Production**_\n" || header="${header}\n_Release type: **Testing / Pre-release**_\n"
-          echo -e "${header}\n" > RELEASE_NOTES.md
+          printf "%b\n" "${header}" > RELEASE_NOTES.md
 
-          for vdir in $(find _rpm_diff_all -maxdepth 1 -mindepth 1 -type d | sort); do
-            vmj=$(basename "$vdir")
+          # vmj（8/9/10/10-kitten 等）を検出してグループ化
+          mapfile -t VMJS < <(find _rpm_diff_all -type f -name 'rpm_diff_*.md' \
+            | sed -E 's#^.*/([0-9]+|10-kitten)/rpm_diff_.*#\1#' \
+            | sort -u)
+
+          for vmj in "${VMJS[@]}"; do
             echo -e "\n## AlmaLinux ${vmj}\n" >> RELEASE_NOTES.md
-            shopt -s nullglob
-            files=("${vdir}"/rpm_diff_*_*.md)
-            if [ ${#files[@]} -eq 0 ]; then
+
+            # 該当 vmj の md を列挙
+            mapfile -t FILES < <(find "_rpm_diff_all/${vmj}" -maxdepth 1 -type f -name "rpm_diff_${vmj}_*.md" | sort)
+            if [ ${#FILES[@]} -eq 0 ]; then
               echo "_No RPM diff generated for ${vmj}._" >> RELEASE_NOTES.md
               continue
             fi
-            for f in "${files[@]}"; do
-              itype=$(basename "$f" | sed -E 's/^rpm_diff_[0-9]+_([a-z0-9_-]+)\.md$/\1/')
+
+            for f in "${FILES[@]}"; do
+              itype=$(basename "$f" | sed -E 's/^rpm_diff_([0-9]+|10-kitten)_([a-z0-9_-]+)\.md$/\2/')
               echo -e "\n### Image type: \`${itype}\`\n" >> RELEASE_NOTES.md
               cat "$f" >> RELEASE_NOTES.md
             done
           done
 
+          # すべて同梱した tar.gz も添付用に作る
           tar -czf rpm-diff-artifacts-${DATE_STAMP}.tar.gz -C _rpm_diff_all .
 
-          echo "tag=v${DATE_STAMP}" >> $GITHUB_OUTPUT
-          echo "name=AlmaLinux Container RPM diffs (${DATE_STAMP})" >> $GITHUB_OUTPUT
+          echo "tag=v${DATE_STAMP}" >> "$GITHUB_OUTPUT"
+          echo "name=AlmaLinux Container RPM diffs (${DATE_STAMP})" >> "$GITHUB_OUTPUT"
       - name: Create/Update GitHub Release
         if: steps.chk.outputs.found == 'true'
         uses: softprops/action-gh-release@v2
