@@ -1,93 +1,76 @@
 name: Build, test and push to the Client Library
-
 on:
   workflow_dispatch:
-      inputs:
-        production:
-          description: |
-            'Push to production registries'
-            'not checked - to testing'
-          required: true
-          type: boolean
-          default: false
-
-        notify_mattermost:
-          description: 'Send notification to Mattermost'
-          required: true
-          type: boolean
-          default: false
-
-        version_major:
-          description: 'AlmaLinux major version'
-          required: true
-          default: '10'
-          type: choice
-          options:
-            - 10-kitten
-            - 10
-            - 9
-            - 8
-
-        type_default:
-          description: 'default'
-          required: true
-          type: boolean
-          default: true
-
-        type_minimal:
-          description: 'minimal'
-          required: true
-          type: boolean
-          default: true
-
-        type_micro:
-          description: 'micro'
-          required: true
-          type: boolean
-          default: true
-
-        type_base:
-          description: 'base'
-          required: true
-          type: boolean
-          default: true
-
-        type_init:
-          description: 'init'
-          required: true
-          type: boolean
-          default: true
-
-        type_toolbox:
-          description: 'toolbox'
-          required: true
-          type: boolean
-          default: true
-
+    inputs:
+      production:
+        description: |
+          'Push to production registries'
+          'not checked - to testing'
+        required: true
+        type: boolean
+        default: false
+      notify_mattermost:
+        description: 'Send notification to Mattermost'
+        required: true
+        type: boolean
+        default: false
+      version_major:
+        description: 'AlmaLinux major version'
+        required: true
+        default: '10'
+        type: choice
+        options:
+          - 10-kitten
+          - 10
+          - 9
+          - 8
+      type_default:
+        description: 'default'
+        required: true
+        type: boolean
+        default: true
+      type_minimal:
+        description: 'minimal'
+        required: true
+        type: boolean
+        default: true
+      type_micro:
+        description: 'micro'
+        required: true
+        type: boolean
+        default: true
+      type_base:
+        description: 'base'
+        required: true
+        type: boolean
+        default: true
+      type_init:
+        description: 'init'
+        required: true
+        type: boolean
+        default: true
+      type_toolbox:
+        description: 'toolbox'
+        required: true
+        type: boolean
+        default: true
   schedule:
     # run every day at 04:00 UTC
-    - cron:  '00 04 * * *'
-
+    - cron: '00 04 * * *'
 env:
   # List of versions to build on schedule
   # TODO: add 10 when it is released
   # Kitten should not be built on schedule
   versions_list: '"8", "9", "10"'
-
   # List image types to build on schedule
   image_types: '"default", "minimal", "micro", "base", "init", "toolbox"'
-
   # Latest version
   version_latest: 9
-
   # Platforms list
   platforms: 'linux/amd64, linux/ppc64le, linux/s390x, linux/arm64'
-
   # Registries lists
   registries_production: 'docker.io/almalinux, quay.io/almalinuxorg, ghcr.io/almalinux'
-  registries_testing: 'quay.io/almalinuxautobot'
-
-
+  registries_testing: 'quay.io/ghcr.io/unixtech-06'
 jobs:
   init-data:
     name: Set matrix, prepare variables
@@ -100,7 +83,6 @@ jobs:
       date_time_stamp: ${{ steps.init-data.outputs.date_time_stamp }}
       date_stamp: ${{ steps.init-data.outputs.date_stamp }}
       time_stamp: ${{ steps.init-data.outputs.time_stamp }}
-
     steps:
       - name: Set matrix, prepare variables
         id: init-data
@@ -132,7 +114,6 @@ jobs:
           echo "date_time_stamp=${date_time_stamp}" >> "$GITHUB_OUTPUT"
           echo "date_stamp=${date_stamp}" >> "$GITHUB_OUTPUT"
           echo "time_stamp=${time_stamp}" >> "$GITHUB_OUTPUT"
-
   build-test-push:
     name: Deploy ${{ matrix.version_major }} ${{ matrix.image_types }} images
     runs-on: ubuntu-24.04
@@ -150,10 +131,8 @@ jobs:
       time_stamp: ${{ needs.init-data.outputs.time_stamp }}
       notify_mattermost: ${{ needs.init-data.outputs.notify_mattermost }}
       production: ${{ needs.init-data.outputs.production }}
-
     steps:
-      -
-        name: Prepare AlmaLinux Minor version number
+      - name: Prepare AlmaLinux Minor version number
         run: |
           case ${{ matrix.version_major }} in
             8)
@@ -168,9 +147,7 @@ jobs:
               echo "Almalinux ${{ matrix.version_major }} is not supported!" && false
           esac
           echo "version_minor=${version_minor}" >> $GITHUB_ENV
-
-      -
-        name: Check update
+      - name: Check update
         id: check-update
         run: |
           # dnf check-update --secseverity=Important
@@ -189,29 +166,25 @@ jobs:
 
           echo "check_update=${check_update}" >> "$GITHUB_ENV"
           echo "Exit code: '$check_update'"
-
-      -
-        name: Set platforms and registries
+      - name: Set platforms and registries
         if: env.check_update != 0
         run: |
-            # Platforms
-            platforms="${{ env.platforms }}"
-            case ${{ matrix.version_major }} in
-              8|9)
-                platforms="linux/386, ${platforms}" ;;
-              10*)
-                platforms="linux/amd64/v2, ${platforms}" ;;
-            esac
-            echo "platforms=${platforms}" >> $GITHUB_ENV
+          # Platforms
+          platforms="${{ env.platforms }}"
+          case ${{ matrix.version_major }} in
+            8|9)
+              platforms="linux/386, ${platforms}" ;;
+            10*)
+              platforms="linux/amd64/v2, ${platforms}" ;;
+          esac
+          echo "platforms=${platforms}" >> $GITHUB_ENV
 
-            # Registries
-            registries="${{ env.registries_testing }}"
-            [[ "${{ needs.init-data.outputs.production }}" == "true" ]] && \
-              registries="${{ env.registries_production }}"
-            echo "registries=${registries}" >> $GITHUB_ENV
-
-      -
-        name: Generate list of images to use as base name for tags
+          # Registries
+          registries="${{ env.registries_testing }}"
+          [[ "${{ needs.init-data.outputs.production }}" == "true" ]] && \
+            registries="${{ env.registries_production }}"
+          echo "registries=${registries}" >> $GITHUB_ENV
+      - name: Generate list of images to use as base name for tags
         if: env.check_update != 0
         run: |
           # list of registries to push to
@@ -239,9 +212,7 @@ jobs:
 
           # [Debug]
           echo $IMAGE_NAMES
-
-      -
-        name: Enable containerd image store on Docker Engine
+      - name: Enable containerd image store on Docker Engine
         if: env.check_update != 0
         run: |
           # JQ file to switch into containerd image store
@@ -251,74 +222,56 @@ jobs:
           sudo sh -c 'jq -n -f containerd-snapshotter.jq > /etc/docker/daemon.json'
           sudo systemctl restart docker
           docker info -f '{{ .DriverStatus }}'
-
-      -
-        name: Checkout ${{ github.repository }}, branch 'main'
+      - name: Checkout ${{ github.repository }}, branch 'main'
         if: env.check_update != 0
         uses: actions/checkout@v4
-
-      -
-        name: Checkout ${{ github.repository }}, branch '${{ matrix.version_major }}', path '${{ matrix.version_major }}'
+      - name: Checkout ${{ github.repository }}, branch '${{ matrix.version_major }}', path '${{ matrix.version_major }}'
         if: env.check_update != 0
         uses: actions/checkout@v4
         with:
           ref: ${{ matrix.version_major }}
           path: ${{ matrix.version_major }}
-
-      -
-        name: Set up QEMU
+      - name: Set up QEMU
         if: env.check_update != 0
         uses: docker/setup-qemu-action@v3
-      -
-        name: Set up Docker Buildx
+      - name: Set up Docker Buildx
         if: env.check_update != 0
         uses: docker/setup-buildx-action@v3
-
-      -
-        name: Login to Docker.io
+      - name: Login to Docker.io
         if: contains(env.registries, 'docker.io') && env.check_update != 0
         uses: docker/login-action@v3
         with:
           registry: docker.io
           username: ${{ env.production == 'true' && secrets.DOCKERHUB_USERNAME || secrets.TEST_DOCKERHUB_USERNAME }}
           password: ${{ env.production == 'true' && secrets.DOCKERHUB_TOKEN || secrets.TEST_DOCKERHUB_TOKEN }}
-
-      -
-        name: Login to Quay.io
+      - name: Login to Quay.io
         if: contains(env.registries, 'quay.io') && env.check_update != 0
         uses: docker/login-action@v3
         with:
           registry: quay.io
           username: ${{ env.production == 'true' && secrets.QUAY_IO_USERNAME || secrets.TEST_QUAY_IO_USERNAME }}
           password: ${{ env.production == 'true' && secrets.QUAY_IO_CLI_PASSWORD || secrets.TEST_QUAY_IO_CLI_PASSWORD }}
-
-      -
-        name: Login to Ghcr.io
+      - name: Login to Ghcr.io
         if: contains(env.registries, 'ghcr.io') && env.check_update != 0
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ env.production == 'true' && secrets.GIT_HUB_USERNAME || secrets.TEST_GITHUB_USERNAME }}
           password: ${{ env.production == 'true' && secrets.GIT_HUB_TOKEN || secrets.TEST_GITHUB_TOKEN }}
-
-      -
-        name: Generate tags and prepare metadata to build and push
+      - name: Generate tags and prepare metadata to build and push
         if: env.check_update != 0
         id: meta
         uses: docker/metadata-action@v5
         with:
           # list of Docker images to use as base names for tags
           images: ${{ env.IMAGE_NAMES }}
-
           # list of tags
           tags: |
             type=raw,value=latest,enable=${{ matrix.image_types != 'default' || ( matrix.image_types == 'default' && matrix.version_major == env.version_latest ) }}
             type=raw,value=${{ matrix.version_major }},enable=true
             type=raw,value=${{ matrix.version_major }}${{ env.version_minor }},enable=true
             type=raw,value=${{ matrix.version_major }}${{ env.version_minor }}-${{ env.date_stamp }},enable=true
-
-      -
-        name: Build images
+      - name: Build images
         if: env.check_update != 0
         id: build-images
         uses: docker/build-push-action@v5
@@ -330,9 +283,7 @@ jobs:
           push: false
           load: true
           tags: ${{ steps.meta.outputs.tags }}
-
-      -
-        name: Test images
+      - name: Test images
         if: env.check_update != 0
         id: test-images
         run: |
@@ -347,16 +298,12 @@ jobs:
             && cat /etc/almalinux-release \
             && ( test "${{ matrix.image_types }}" != "micro" && rpm -q gpg-pubkey) || true "
           done
-
-      -
-        name: Install tools for tag discovery and diff
+      - name: Install tools for tag discovery and diff
         if: env.check_update != 0
         run: |
           sudo apt-get update -y
           sudo apt-get install -y skopeo jq coreutils
-
-      -
-        name: Detect previous released tag for this image type
+      - name: Detect previous released tag for this image type
         if: env.check_update != 0
         id: detect-prev
         env:
@@ -414,9 +361,7 @@ jobs:
           echo "prev_tag=${CAND}" >> $GITHUB_ENV
           echo "prev_found=true" >> $GITHUB_OUTPUT
           echo "Previous: ${IMAGE_REPO}:${CAND}"
-
-      -
-        name: Generate RPM lists (new vs previous) per platform
+      - name: Generate RPM lists (new vs previous) per platform
         if: env.check_update != 0
         id: rpm-lists
         env:
@@ -453,9 +398,7 @@ jobs:
                 : # 失敗しても続行（プラットフォーム未提供の可能性）
             fi
           done
-
-      -
-        name: Diff RPM sets and build Markdown changelog
+      - name: Diff RPM sets and build Markdown changelog
         if: env.check_update != 0
         id: rpm-diff
         env:
@@ -544,17 +487,13 @@ jobs:
           # 保存物を分かりやすいパスに
           mkdir -p rpm_diff_artifacts/${VMJ}
           mv "${out}" "rpm_diff_artifacts/${VMJ}/rpm_diff_${VMJ}_${IMT}.md"
-
-      -
-        name: Upload RPM diff artifacts
+      - name: Upload RPM diff artifacts
         if: env.check_update != 0
         uses: actions/upload-artifact@v4
         with:
           name: rpm-diff-${{ matrix.version_major }}-${{ matrix.image_types }}
           path: rpm_diff_artifacts/${{ matrix.version_major }}/
-
-      -
-        name: Push images to Client Library
+      - name: Push images to Client Library
         if: env.check_update != 0
         id: push-images
         uses: docker/build-push-action@v5
@@ -565,9 +504,7 @@ jobs:
           platforms: ${{ env.platforms }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
-
-      -
-        name: Prepare Mattermost message
+      - name: Prepare Mattermost message
         if: env.check_update != 0
         run: |
           # Mattermost message heading
@@ -591,16 +528,13 @@ jobs:
           ${{ steps.meta.outputs.tags }}
           ```
           EOF
-
       - name: Upload Mattermost message artifacts
         uses: actions/upload-artifact@v4
         if: env.check_update != 0
         with:
           name: mattermost-message-${{ matrix.version_major }}-${{ matrix.image_types }}
           path: ${{ matrix.version_major }}*_mattermost.md
-
-      -
-        name: Extract RootFS (default and minimal only)
+      - name: Extract RootFS (default and minimal only)
         id: extract-rootfs
         # 'default' or 'minimal' images only go to Docker Official Library
         if: ( matrix.image_types == 'default' || matrix.image_types == 'minimal' ) && env.check_update != 0
@@ -681,10 +615,8 @@ jobs:
 
           echo "[Debug]"
           ls -1 ${pwd}/${{ matrix.version_major }}/${{ matrix.image_types }}/*/*.tar.xz
-
       # Change date stamp in '${version_major}/${image_types}/${arch}/Dockerfile'
-      -
-        name: Change date stamp in Dockerfile (default and minimal only)
+      - name: Change date stamp in Dockerfile (default and minimal only)
         # 'default' or 'minimal' images only go to Docker Official Library
         if: ( matrix.image_types == 'default' || matrix.image_types == 'minimal' ) && env.check_update != 0
         run: |
@@ -714,10 +646,8 @@ jobs:
             echo "[Debug] ${dockerfile}"
             cat ${dockerfile}
           done
-
       # Commit '${version_major}/${image_types}/${arch}/*'
-      -
-        name: "Commit and push ${{ matrix.image_types }}/*/* Dockerfile and RootFS (branch ${{ matrix.version_major }})"
+      - name: "Commit and push ${{ matrix.image_types }}/*/* Dockerfile and RootFS (branch ${{ matrix.version_major }})"
         # 'default' or 'minimal' images only and 'Push to production' is checked
         if: ( matrix.image_types == 'default' || matrix.image_types == 'minimal' ) && env.production == 'true' && env.check_update != 0
         uses: EndBug/add-and-commit@v9
@@ -728,7 +658,74 @@ jobs:
           pull: '--rebase --autostash'
           message: "AlmaLinux ${{ matrix.version_major }} ${{ matrix.image_types }} - ${{ env.date_stamp }} ${{ env.time_stamp }} (generated on ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})."
           push: true
+          # ===== New Job: Publish RPM diff to GitHub Release =====
+    publish-rpm-diff:
+      name: Publish RPM diff to GitHub Release
+      runs-on: ubuntu-24.04
+      needs: [init-data, build-test-push]
+      steps:
+        - name: Download all RPM diff artifacts (if any)
+          uses: actions/download-artifact@v4
+          with:
+            pattern: rpm-diff-*
+            merge-multiple: true
+            path: _rpm_diff_all
+          continue-on-error: true
+        - name: Check artifacts existence
+          id: chk
+          run: |
+            if [ ! -d "_rpm_diff_all" ] || ! ls -1 _rpm_diff_all/*/*.md >/dev/null 2>&1; then
+              echo "found=false" >> $GITHUB_OUTPUT
+              echo "No RPM diff artifacts found. Skipping release."
+              exit 0
+            fi
+            echo "found=true" >> $GITHUB_OUTPUT
+        - name: Compose release notes (group by version)
+          if: steps.chk.outputs.found == 'true'
+          id: notes
+          run: |
+            set -euo pipefail
+            DATE_STAMP='${{ needs.init-data.outputs.date_stamp }}'
+            TIME_STAMP='${{ needs.init-data.outputs.time_stamp }}'
+            PROD='${{ needs.init-data.outputs.production }}'
 
+            header="# AlmaLinux Container Images – RPM diffs (${DATE_STAMP} ${TIME_STAMP} UTC)\n"
+            [ "${PROD}" = "true" ] && header="${header}\n_Release type: **Production**_\n" || header="${header}\n_Release type: **Testing / Pre-release**_\n"
+            echo -e "${header}\n" > RELEASE_NOTES.md
+
+            for vdir in $(find _rpm_diff_all -maxdepth 1 -mindepth 1 -type d | sort); do
+              vmj=$(basename "$vdir")
+              echo -e "\n## AlmaLinux ${vmj}\n" >> RELEASE_NOTES.md
+              shopt -s nullglob
+              files=("${vdir}"/rpm_diff_*_*.md)
+              if [ ${#files[@]} -eq 0 ]; then
+                echo "_No RPM diff generated for ${vmj}._" >> RELEASE_NOTES.md
+                continue
+              fi
+              for f in "${files[@]}"; do
+                itype=$(basename "$f" | sed -E 's/^rpm_diff_[0-9]+_([a-z0-9_-]+)\.md$/\1/')
+                echo -e "\n### Image type: \`${itype}\`\n" >> RELEASE_NOTES.md
+                cat "$f" >> RELEASE_NOTES.md
+              done
+            done
+
+            tar -czf rpm-diff-artifacts-${DATE_STAMP}.tar.gz -C _rpm_diff_all .
+
+            echo "tag=v${DATE_STAMP}" >> $GITHUB_OUTPUT
+            echo "name=AlmaLinux Container RPM diffs (${DATE_STAMP})" >> $GITHUB_OUTPUT
+        - name: Create/Update GitHub Release
+          if: steps.chk.outputs.found == 'true'
+          uses: softprops/action-gh-release@v2
+          with:
+            tag_name: ${{ steps.notes.outputs.tag }}
+            name: ${{ steps.notes.outputs.name }}
+            body_path: RELEASE_NOTES.md
+            draft: false
+            prerelease: ${{ needs.init-data.outputs.production != 'true' }}
+            files: |
+              rpm-diff-artifacts-${{ needs.init-data.outputs.date_stamp }}.tar.gz
+          env:
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   notify-mattermost:
     name: Mattermost notification
     runs-on: ubuntu-24.04
@@ -738,11 +735,9 @@ jobs:
       fail-fast: false
       matrix:
         version_major: ${{ fromJSON(needs.init-data.outputs.version_major_matrix) }}
-
     steps:
       - name: Download Mattermost message artifacts
         uses: actions/download-artifact@v4
-
       - name: Create Mattermost message
         run: |
           # Artifacts are downloaded into mattermost-message-${{ matrix.version_major }}-* directory
@@ -766,7 +761,6 @@ jobs:
             cat mattermost-message-${{ matrix.version_major }}-*/${{ matrix.version_major }}_*_mattermost.md
             echo EOF
           } >> "$GITHUB_ENV"
-
       - name: Send notification to Mattermost
         if: env.notify_mattermost == 'true'
         uses: mattermost/action-mattermost-notify@master
@@ -775,7 +769,6 @@ jobs:
           MATTERMOST_CHANNEL: ${{ vars.MATTERMOST_CHANNEL }}
           MATTERMOST_USERNAME: ${{ github.triggering_actor }}
           TEXT: ${{ env.MATTERMOST_TEXT }}
-
   optimize-repo-size:
     # 'default' or 'minimal' images only and 'Push to production' is checked or scheduled run
     if: ( contains(needs.init-data.outputs.image_types_matrix, 'default') || contains(needs.init-data.outputs.image_types_matrix, 'minimal') ) && needs.init-data.outputs.production == 'true'
@@ -788,18 +781,13 @@ jobs:
       fail-fast: false
       matrix:
         version_major: ${{ fromJSON(needs.init-data.outputs.version_major_matrix) }}
-
     steps:
-
-      -
-        name: Checkout ${{ github.repository }}, branch '${{ matrix.version_major }}', path '${{ matrix.version_major }}'
+      - name: Checkout ${{ github.repository }}, branch '${{ matrix.version_major }}', path '${{ matrix.version_major }}'
         uses: actions/checkout@v4
         with:
           ref: ${{ matrix.version_major }}
           path: ${{ matrix.version_major }}
-
-      -
-        name: Optimize size of branch the '${{ matrix.version_major }}'
+      - name: Optimize size of branch the '${{ matrix.version_major }}'
         run: |
           date_stamp=${{ needs.init-data.outputs.date_stamp }}
           cd ${{ matrix.version_major }}
@@ -830,9 +818,7 @@ jobs:
 
           echo "[Debug]"
           git status
-
-      -
-        name: Commit and push ${{ github.repository }}, branch '${{ matrix.version_major }}'
+      - name: Commit and push ${{ github.repository }}, branch '${{ matrix.version_major }}'
         uses: EndBug/add-and-commit@v9
         with:
           default_author: user_info
