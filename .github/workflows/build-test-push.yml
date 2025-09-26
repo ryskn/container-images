@@ -70,7 +70,7 @@ env:
   platforms: 'linux/amd64, linux/ppc64le, linux/s390x, linux/arm64'
   # Registries lists
   registries_production: 'docker.io/almalinux, quay.io/almalinuxorg, ghcr.io/almalinux'
-  registries_testing: 'quay.io/ghcr.io/unixtech-06'
+  registries_testing: 'quay.io/ryosuke_666'
 jobs:
   init-data:
     name: Set matrix, prepare variables
