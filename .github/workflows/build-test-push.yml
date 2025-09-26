@@ -658,74 +658,73 @@ jobs:
           pull: '--rebase --autostash'
           message: "AlmaLinux ${{ matrix.version_major }} ${{ matrix.image_types }} - ${{ env.date_stamp }} ${{ env.time_stamp }} (generated on ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})."
           push: true
+  publish-rpm-diff:
+    name: Publish RPM diff to GitHub Release
+    runs-on: ubuntu-24.04
+    needs: [init-data, build-test-push]
+    steps:
+      - name: Download all RPM diff artifacts (if any)
+        uses: actions/download-artifact@v4
+        with:
+          pattern: rpm-diff-*
+          merge-multiple: true
+          path: _rpm_diff_all
+        continue-on-error: true
+      - name: Check artifacts existence
+        id: chk
+        run: |
+          if [ ! -d "_rpm_diff_all" ] || ! ls -1 _rpm_diff_all/*/*.md >/dev/null 2>&1; then
+            echo "found=false" >> $GITHUB_OUTPUT
+            echo "No RPM diff artifacts found. Skipping release."
+            exit 0
+          fi
+          echo "found=true" >> $GITHUB_OUTPUT
+      - name: Compose release notes (group by version)
+        if: steps.chk.outputs.found == 'true'
+        id: notes
+        run: |
+          set -euo pipefail
+          DATE_STAMP='${{ needs.init-data.outputs.date_stamp }}'
+          TIME_STAMP='${{ needs.init-data.outputs.time_stamp }}'
+          PROD='${{ needs.init-data.outputs.production }}'
 
-    publish-rpm-diff:
-      name: Publish RPM diff to GitHub Release
-      runs-on: ubuntu-24.04
-      needs: [init-data, build-test-push]
-      steps:
-        - name: Download all RPM diff artifacts (if any)
-          uses: actions/download-artifact@v4
-          with:
-            pattern: rpm-diff-*
-            merge-multiple: true
-            path: _rpm_diff_all
-          continue-on-error: true
-        - name: Check artifacts existence
-          id: chk
-          run: |
-            if [ ! -d "_rpm_diff_all" ] || ! ls -1 _rpm_diff_all/*/*.md >/dev/null 2>&1; then
-              echo "found=false" >> $GITHUB_OUTPUT
-              echo "No RPM diff artifacts found. Skipping release."
-              exit 0
+          header="# AlmaLinux Container Images – RPM diffs (${DATE_STAMP} ${TIME_STAMP} UTC)\n"
+          [ "${PROD}" = "true" ] && header="${header}\n_Release type: **Production**_\n" || header="${header}\n_Release type: **Testing / Pre-release**_\n"
+          echo -e "${header}\n" > RELEASE_NOTES.md
+
+          for vdir in $(find _rpm_diff_all -maxdepth 1 -mindepth 1 -type d | sort); do
+            vmj=$(basename "$vdir")
+            echo -e "\n## AlmaLinux ${vmj}\n" >> RELEASE_NOTES.md
+            shopt -s nullglob
+            files=("${vdir}"/rpm_diff_*_*.md)
+            if [ ${#files[@]} -eq 0 ]; then
+              echo "_No RPM diff generated for ${vmj}._" >> RELEASE_NOTES.md
+              continue
             fi
-            echo "found=true" >> $GITHUB_OUTPUT
-        - name: Compose release notes (group by version)
-          if: steps.chk.outputs.found == 'true'
-          id: notes
-          run: |
-            set -euo pipefail
-            DATE_STAMP='${{ needs.init-data.outputs.date_stamp }}'
-            TIME_STAMP='${{ needs.init-data.outputs.time_stamp }}'
-            PROD='${{ needs.init-data.outputs.production }}'
-
-            header="# AlmaLinux Container Images – RPM diffs (${DATE_STAMP} ${TIME_STAMP} UTC)\n"
-            [ "${PROD}" = "true" ] && header="${header}\n_Release type: **Production**_\n" || header="${header}\n_Release type: **Testing / Pre-release**_\n"
-            echo -e "${header}\n" > RELEASE_NOTES.md
-
-            for vdir in $(find _rpm_diff_all -maxdepth 1 -mindepth 1 -type d | sort); do
-              vmj=$(basename "$vdir")
-              echo -e "\n## AlmaLinux ${vmj}\n" >> RELEASE_NOTES.md
-              shopt -s nullglob
-              files=("${vdir}"/rpm_diff_*_*.md)
-              if [ ${#files[@]} -eq 0 ]; then
-                echo "_No RPM diff generated for ${vmj}._" >> RELEASE_NOTES.md
-                continue
-              fi
-              for f in "${files[@]}"; do
-                itype=$(basename "$f" | sed -E 's/^rpm_diff_[0-9]+_([a-z0-9_-]+)\.md$/\1/')
-                echo -e "\n### Image type: \`${itype}\`\n" >> RELEASE_NOTES.md
-                cat "$f" >> RELEASE_NOTES.md
-              done
+            for f in "${files[@]}"; do
+              itype=$(basename "$f" | sed -E 's/^rpm_diff_[0-9]+_([a-z0-9_-]+)\.md$/\1/')
+              echo -e "\n### Image type: \`${itype}\`\n" >> RELEASE_NOTES.md
+              cat "$f" >> RELEASE_NOTES.md
             done
+          done
 
-            tar -czf rpm-diff-artifacts-${DATE_STAMP}.tar.gz -C _rpm_diff_all .
+          tar -czf rpm-diff-artifacts-${DATE_STAMP}.tar.gz -C _rpm_diff_all .
 
-            echo "tag=v${DATE_STAMP}" >> $GITHUB_OUTPUT
-            echo "name=AlmaLinux Container RPM diffs (${DATE_STAMP})" >> $GITHUB_OUTPUT
-        - name: Create/Update GitHub Release
-          if: steps.chk.outputs.found == 'true'
-          uses: softprops/action-gh-release@v2
-          with:
-            tag_name: ${{ steps.notes.outputs.tag }}
-            name: ${{ steps.notes.outputs.name }}
-            body_path: RELEASE_NOTES.md
-            draft: false
-            prerelease: ${{ needs.init-data.outputs.production != 'true' }}
-            files: |
-              rpm-diff-artifacts-${{ needs.init-data.outputs.date_stamp }}.tar.gz
-          env:
-            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          echo "tag=v${DATE_STAMP}" >> $GITHUB_OUTPUT
+          echo "name=AlmaLinux Container RPM diffs (${DATE_STAMP})" >> $GITHUB_OUTPUT
+      - name: Create/Update GitHub Release
+        if: steps.chk.outputs.found == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.notes.outputs.tag }}
+          name: ${{ steps.notes.outputs.name }}
+          body_path: RELEASE_NOTES.md
+          draft: false
+          prerelease: ${{ needs.init-data.outputs.production != 'true' }}
+          files: |
+            rpm-diff-artifacts-${{ needs.init-data.outputs.date_stamp }}.tar.gz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   notify-mattermost:
     name: Mattermost notification
     runs-on: ubuntu-24.04
