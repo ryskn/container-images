@@ -498,12 +498,12 @@ jobs:
                 <(join -t $'\t' -1 1 -2 1 <(cut -f1,2 "${old}" | sort) <(cut -f1,2 "${new}" | sort -k1,1) | sort -k1,1) \
                 <(cut -f1,2 "${new}" | sort -k1,1) >/dev/null 2>&1 || true
               # 上の一時計算をやり直しつつ、実際に差分抽出
-              updated.tmp=$(mktemp)
+              updated_tmp=$(mktemp)
               awk -F'\t' 'NR==FNR{old[$1]=$2;next}{ if($1 in old && old[$1]!=$2){ print $1"\t"old[$1]" -> "$2 } }' \
-                "${old}" "${new}" > "${updated.tmp}"
+                "${old}" "${new}" > "${updated_tmp}"
 
               addc=$(wc -l < added.tmp | tr -d ' ')
-              updc=$(wc -l < "${updated.tmp}" | tr -d ' ')
+              updc=$(wc -l < "${updated_tmp}" | tr -d ' ')
               delc=$(wc -l < removed.tmp | tr -d ' ')
 
               echo "" >> "${out}"
@@ -515,7 +515,7 @@ jobs:
               echo "**Updated (${updc})**" >> "${out}"
               echo "" >> "${out}"
               if [ "$updc" -gt 0 ]; then
-                awk -F'\t' '{printf "- %s: %s\n",$1,$2}' "${updated.tmp}" >> "${out}"
+                awk -F'\t' '{printf "- %s: %s\n",$1,$2}' "${updated_tmp}" >> "${out}"
               else
                 echo "- (none)" >> "${out}"
               fi
@@ -527,7 +527,7 @@ jobs:
               echo "" >> "${out}"
 
               any_section=true
-              rm -f added.tmp removed.tmp "${updated.tmp}"
+              rm -f added.tmp removed.tmp "${updated_tmp}"
             else
               # 旧が無い場合は全部 Added
               echo "" >> "${out}"
