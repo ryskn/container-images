@@ -71,6 +71,7 @@ env:
   # Registries lists
   registries_production: 'docker.io/almalinux, quay.io/almalinuxorg, ghcr.io/almalinux'
   registries_testing: 'quay.io/ryosuke_666'
+  registries_prev_lookup: 'quay.io/almalinuxorg, ghcr.io/almalinux'
 jobs:
   init-data:
     name: Set matrix, prepare variables
@@ -311,7 +312,7 @@ jobs:
           IMT: ${{ matrix.image_types }}
           VMIN: ${{ env.version_minor }}
           DATE: ${{ env.date_stamp }}
-          REGS: ${{ env.registries }}
+          REGS: ${{ env.registries_prev_lookup }}  
         run: |
           # どのレジストリを見るかを決める（docker.io は default不可の制約があるので優先は ghcr -> quay）
           choose_registry() {
