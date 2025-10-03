@@ -356,7 +356,6 @@ jobs:
           IMT: ${{ matrix.image_types }}
           VMIN: ${{ env.version_minor }}
           DATE: ${{ env.date_stamp }}
-          REGS: ${{ env.IMAGE_NAMES }}
         run: |
           IMAGE_REPO="${IMAGE_NAMES%%,*}"
 
