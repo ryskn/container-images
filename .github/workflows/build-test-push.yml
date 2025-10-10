@@ -394,6 +394,7 @@ jobs:
           PLATFORMS: ${{ env.platforms }}
           VMJ: ${{ matrix.version_major }}
           IMT: ${{ matrix.image_types }}
+          LABEL_KEY: org.almalinux.sbom
         run: |
           set -euo pipefail
           mkdir -p rpm_lists/${VMJ}/${IMT}
