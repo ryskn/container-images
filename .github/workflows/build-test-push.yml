@@ -446,17 +446,17 @@ jobs:
         run: |
           set -euo pipefail
           out="rpm_diff_${VMJ}_${IMT}.md"
-          echo "**AlmaLinux ${VMJ} ${IMT}** RPM changelog (build \`${DTS}\`)" > "${out}"
+
+          # 冒頭は「前回からの変更」だけ
           if [ -n "${PREV_TAG}" ]; then
-            echo "" >> "${out}"
-            echo "- Compared to previous: \`${PREV_TAG}\`" >> "${out}"
+            echo "Changes since last version (${PREV_TAG}):" > "${out}"
           else
-            echo "" >> "${out}"
-            echo "- No previous dated tag found. Treating all as **Added**." >> "${out}"
+            echo "Changes since last version: (first release)" > "${out}"
           fi
           echo "" >> "${out}"
 
           any_section=false
+
           for p in ${PLATFORMS//,/ }; do
             plat=$(echo "$p" | xargs)
             key="${plat//\//_}"
@@ -465,21 +465,18 @@ jobs:
 
             [ ! -f "${new}" ] && continue
 
-
-            # Collapse each platform's RPM diff into a <details> section
-            printf '\n<details>\n<summary>Platform: `%s`</summary>\n\n' "$plat" >> "${out}"
+            # プラットフォームごとに折りたたみ
+            {
+              echo "<details>"
+              printf "<summary>Platform: \`%s\`</summary>\n\n" "$plat"
+            } >> "${out}"
 
             if [ -f "${old}" ]; then
-              # Added / Removed sets based on names
+              # 名前一覧は事前ステップで作成済み（*.names）
               comm -13 "${old%.txt}.names" "${new%.txt}.names" > added.tmp || true
               comm -23 "${old%.txt}.names" "${new%.txt}.names" > removed.tmp || true
 
-              # Updated: same name but different versions
-              join -j1 -t $'\t' -o 0,1.2,2.2 \
-                <(join -t $'\t' -1 1 -2 1 <(cut -f1,2 "${old}" | sort) <(cut -f1,2 "${new}" | sort -k1,1) | sort -k1,1) \
-                <(cut -f1,2 "${new}" | sort -k1,1) >/dev/null 2>&1 || true
-
-              # Recompute diffs and extract version changes
+              # 版数変更（Updated）
               updated_tmp=$(mktemp)
               awk -F'\t' 'NR==FNR{old[$1]=$2;next}{ if($1 in old && old[$1]!=$2){ print $1"\t"old[$1]" → "$2 } }' \
                 "${old}" "${new}" > "${updated_tmp}"
@@ -488,24 +485,12 @@ jobs:
               updc=$(wc -l < "${updated_tmp}" | tr -d ' ')
               delc=$(wc -l < removed.tmp | tr -d ' ')
 
-              printed=false              
+              printed=false
+              echo "**Package Changes**" >> "${out}"
+              echo "" >> "${out}"
 
-              # Added 
-              if [ "$addc" -gt 0 ]; then
-                {
-                  echo ""
-                  echo "**Added (${addc})**"
-                  echo ""
-                  awk '{print "- " $0}' added.tmp
-                  echo ""
-                } >> "${out}"
-                printed=true
-              fi
-
-              # Updated
               if [ "$updc" -gt 0 ]; then
                 {
-                  echo ""
                   echo "**Updated (${updc})**"
                   echo ""
                   awk -F'\t' '{printf "- %s: %s\n",$1,$2}' "${updated_tmp}"
@@ -514,10 +499,19 @@ jobs:
                 printed=true
               fi
 
-              # Removed
+              if [ "$addc" -gt 0 ]; then
+                {
+                  echo "**Added (${addc})**"
+                  echo ""
+                  # 追加は name: version で表記
+                  awk -v OFS='\t' 'NR==FNR{ver[$1]=$2;next}{n=$0; if(n!=""){ printf "- %s: %s\n", n, ver[n] }}' "${new}" added.tmp
+                  echo ""
+                } >> "${out}"
+                printed=true
+              fi
+
               if [ "$delc" -gt 0 ]; then
                 {
-                  echo ""
                   echo "**Removed (${delc})**"
                   echo ""
                   awk '{print "- " $0}' removed.tmp
@@ -527,27 +521,27 @@ jobs:
               fi
 
               [ "$printed" = true ] && any_section=true
-
               rm -f added.tmp removed.tmp "${updated_tmp}"
             else
-              # No previous list: treat all as Added
+              # 前回なし → 初回は「追加のみ」を参考情報として出す
+              echo "**Package Changes**" >> "${out}"
               echo "" >> "${out}"
-              echo "**Added**" >> "${out}"
+              echo "_No previous version — initial publication (showing all as Added)_" >> "${out}"
               echo "" >> "${out}"
-              cut -f1 "${new}" | awk '{print "- " $0}' >> "${out}"
+              awk -F'\t' '{printf "- %s: %s\n",$1,$2}' "${new}" >> "${out}"
               echo "" >> "${out}"
               any_section=true
-
             fi
-            # Close the <details> section for this platform
-            printf "\n</details>\n" >> "${out}"
+
+            echo "</details>" >> "${out}"
+            echo "" >> "${out}"
           done
 
-          $any_section || echo "_No RPM changes detected (no comparable platforms found)._" >> "${out}"
+          $any_section || echo "_No package changes detected._" >> "${out}"
 
-          # Move artifacts into a readable path
           mkdir -p rpm_diff_artifacts/${VMJ}
           mv "${out}" "rpm_diff_artifacts/${VMJ}/rpm_diff_${VMJ}_${IMT}.md"
+
 
       -
         name: Build rechunk-style label payload (gzip+base64)
