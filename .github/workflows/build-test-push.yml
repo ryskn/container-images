@@ -85,7 +85,8 @@ env:
 
   # Registries lists
   registries_production: 'docker.io/almalinux, quay.io/almalinuxorg, ghcr.io/almalinux'
-  registries_testing: 'quay.io/almalinuxautobot'
+    #  registries_testing: 'quay.io/almalinuxautobot'
+  registries_testing: 'quay.io/ryosuke_666'
 
 jobs:
   init-data:
