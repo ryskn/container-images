@@ -466,7 +466,7 @@ jobs:
 
 
             # Collapse each platform's RPM diff into a <details> section
-            printf "\n<details>\n<summary>Platform: \`%s\`</summary>\n\n" "$plat" >> "$
+            printf '\n<details>\n<summary>Platform: `%s`</summary>\n\n' "$plat" >> "${out}"
 
             if [ -f "${old}" ]; then
               # Added / Removed sets based on names
